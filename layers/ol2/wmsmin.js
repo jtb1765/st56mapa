@@ -1,0 +1,1 @@
+Drupal.st56mapa.layers.wms=function(a,t,r,e){return new OpenLayers.Layer.WMS(r.name,r.url,{layers:r.capas,transparent:!0,format:r.format},{isBaseLayer:!0,displayOutsideMaxExtent:!1,attribution:r.attribution})};

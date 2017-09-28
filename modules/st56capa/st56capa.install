@@ -1,0 +1,19 @@
+<?php
+function st56capa_field_schema($field) {
+  $columns = array(
+      'idname' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+      'tipocapa' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+      'grupo' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+      'visible' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'seleccionable' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+  );
+  $indexes = array(
+    'idname' => array('idname'),
+    'tipocapa' => array('tipocapa'),
+    'grupo' => array('grupo'),
+  );
+  return array(
+    'columns' => $columns,
+    'indexes' => $indexes,
+  );
+}

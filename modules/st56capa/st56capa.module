@@ -1,0 +1,176 @@
+<?php
+/**
+ * @file
+ * A field using the Field API.
+ *
+ * This is updated from Barry Jaspan's presentation at Drupalcon Paris,
+ * @link http://acquia.com/community/resources/acquia-tv/intro-field-api-module-developers Video Presentation @endlink
+ *
+ * Providing a field requires:
+ * - Defining a field
+ *   - hook_field_info()
+ *   - hook_field_schema()
+ *   - hook_field_validate()
+ *   - hook_field_is_empty()
+ *
+ * - Defining a formatter for the field (the portion that outputs the field for
+ *   display)
+ *   - hook_field_formatter_info()
+ *   - hook_field_formatter_view()
+ *
+ * - Defining a widget for the edit form
+ *   - hook_field_widget_info()
+ *   - hook_field_widget_form()
+ *
+ * *
+ * See @link field_types Field Types API @endlink
+ */
+function st56capa_field_info(){
+  return array(
+    'st56capa' => array(
+      'label' => t('st56Capa'),
+      'description' => t('Permite añadir capas a un st56mapa'),
+      'default_widget' => 'st56capa_widget',
+      'default_formatter' => 'st56capa_formatter_1',
+    ),
+  );
+}
+
+ /* function st56capa_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+   foreach ($items as $delta => $item) {
+     if (empty($item['idname'])) {
+       $errors[$field]['idname'][$langcode][$delta][] = array(
+           'error' => 'El campo no puede estar vacío',
+           'message' => t('Debe seleccionar una capa base de la lista'),
+       );
+     }
+   }
+ } */
+
+function st56capa_field_is_empty($item, $field) {
+   return empty($item['idname']);
+ }
+
+ /***********************************************************************
+ *  Field Type API: Formatter
+ *
+ *  These are the api hooks that present formatted (themed) output to the
+ *  user.
+ *  No se presenta ningún resultado en view-mode full, ya que solo se
+ *  utiliza para obtener los controles del mapa
+ *  Podriamos obtener un listado xml en vista resumen?
+ **********************************************************************/
+function st56capa_field_formatter_info() {
+  return array (
+      'st56capa_formatter_1' => array (
+          'label' => t ( 'Solo para tus ojos. No produce salida' ),
+          'field types' => array (
+              'st56capa'
+          ),
+      ),
+      'st56capa_formatter_2' => array(
+          'label' => t('Resumen en formato html'),
+          'field types' => array(
+              'st56capa'
+          )
+      )
+  );
+}
+
+function st56capa_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display){
+  $element = array();
+  switch ($display['type']) {
+    case 'st56capa_formatter_1':
+      foreach ($items as $delta => $item) {
+        $element['$delta']['#markup'] = '';
+      }
+      break;
+    case 'st56capa_formatter_2':
+      foreach ($items as $delta => $item) {
+        $element['$delta']['#markup'] = t("<p>Capa: @a, Tipo: @b</p>",
+            array(
+                '@a'=>$item['idname'],
+                '@b'=>$item['tipocapa'],
+            ));
+      }
+      break;
+  }
+  return $element;
+}
+
+/**************************************************************************
+ * Field Type API: Widget
+ *
+ * The widget is the form element used to receive input from the user
+ * when the field is being populated.
+ **************************************************************************/
+
+function st56capa_field_widget_info() {
+  return array (
+      'st56capa_widget' => array (
+          'label' => t ( 'Añadir capa al mapa' ),
+          'field types' => array (
+              'st56capa'
+          ),
+      ),
+  );
+}
+
+function st56capa_field_widget_form($form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  if (!isset($form_state['st56capa']['grupos_capas']) ) {
+    $almacen_capas = new DOMDocument();
+    if ($almacen_capas->load("private://mapas/configuracion/st56mapa_capas_r5.xml") && $almacen_capas->validate()) {
+      $lista_grupos_capas = array('' => t('Ninguna'));
+      $grupos = $almacen_capas->getElementsByTagName('grupo');
+      foreach ($grupos as $grupo){
+        $gruponame = $grupo->getAttribute('name');
+        $capas = $grupo->getElementsByTagName('capa');
+        foreach ($capas as $capa) {
+          $lista_grupos_capas[$gruponame][$capa->getAttribute('idname')] = $capa->getAttribute('name');
+        }
+      }
+      $form_state['st56capa']['grupos_capas'] = $lista_grupos_capas;
+    }
+  }
+
+  $element += array (
+      '#delta' => $delta
+  );
+
+  $element ['idname'] = array (
+      '#type' => 'select',
+      '#options' => $form_state['st56capa']['grupos_capas'],
+      '#default_value' => isset($items[$delta]['idname']) ? $items[$delta]['idname'] : '',
+      '#title' => 'Capa',
+  );
+
+  $element ['tipocapa'] = array (
+      '#type' => 'select',
+      '#options' => drupal_map_assoc(array('', 'capabase', 'capadatos')),
+      '#default_value' => isset($items[$delta]['tipocapa']) ? $items[$delta]['tipocapa'] : '',
+      '#title' => 'Tipo'
+  );
+
+  $element ['grupo'] = array (
+      '#type' => 'textfield',
+      '#default_value' => isset($items[$delta]['grupo']) ? $items[$delta]['grupo'] : '',
+      '#title' => 'Grupo',
+      '#size' => 30,
+      '#maxlength' => 255,
+  );
+
+  $element ['visible'] = array (
+      '#type' => 'select',
+      '#options' => array('-1' => t('Por defecto'), '0' => t('No'), '1' => t('Sí')),
+      '#default_value' => isset($items[$delta]['visible']) ? $items[$delta]['visible'] : '',
+      '#title' => 'Visible'
+  );
+
+  $element ['seleccionable'] = array (
+      '#type' => 'select',
+      '#options' => array('-1' => t('Por defecto'), '0' => t('No'), '1' => t('Sí (vectorial)') , '2' => t('Sí (wms')),
+      '#default_value' => isset($items[$delta]['seleccionable']) ? $items[$delta]['seleccionable'] : '',
+      '#title' => 'Seleccionable'
+  );
+  return $element;
+}

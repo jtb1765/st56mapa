@@ -1,0 +1,18 @@
+<?php
+function st56destacado_field_schema($field) {
+  $columns = array(
+      'idname' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'name' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'lon' => array('type' => 'numeric', 'precision' => 20, 'scale' => 12, 'not null' => FALSE,),
+      'lat' => array('type' => 'numeric', 'precision' => 20, 'scale' => 12, 'not null' => FALSE,),
+      'zoom' => array('type' => 'numeric', 'precision' => 20, 'scale' => 12, 'not null' => FALSE,),
+      'srs' => array('type' => 'varchar', 'length' => 30, 'not_null' => FALSE),
+  );
+  $indexes = array(
+    'idname' => array('idname'),
+  );
+  return array(
+    'columns' => $columns,
+    'indexes' => $indexes,
+  );
+}

@@ -1,0 +1,1 @@
+!function(a){Drupal.behaviors.st56mapa_control_scale={attach:function(o,e){a(".jmapas-map").once("jmapas-control-scale",function(){var a=e.st56mapa.map_datos,o=a.containers.olscale,n=a.controles[o].olscale,t={div:document.getElementById(n.divid)};a[o].push(new OpenLayers.Control.Scale(t))})}}}(jQuery);

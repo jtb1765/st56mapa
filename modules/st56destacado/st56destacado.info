@@ -1,0 +1,5 @@
+name = st56Destacados
+description = Localizaciones de presentación rápida en el mapa
+package = Sector56
+core = 7.x
+dependencies[] = st56mapa

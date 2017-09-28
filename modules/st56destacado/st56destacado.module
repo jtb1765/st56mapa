@@ -1,0 +1,210 @@
+<?php
+/**
+ * @file
+ * A field using the Field API.
+ *
+ * This is updated from Barry Jaspan's presentation at Drupalcon Paris,
+ * @link http://acquia.com/community/resources/acquia-tv/intro-field-api-module-developers Video Presentation @endlink
+ *
+ * Providing a field requires:
+ * - Defining a field
+ *   - hook_field_info()
+ *   - hook_field_schema()
+ *   - hook_field_validate()
+ *   - hook_field_is_empty()
+ *
+ * - Defining a formatter for the field (the portion that outputs the field for
+ *   display)
+ *   - hook_field_formatter_info()
+ *   - hook_field_formatter_view()
+ *
+ * - Defining a widget for the edit form
+ *   - hook_field_widget_info()
+ *   - hook_field_widget_form()
+ *
+ * *
+ * See @link field_types Field Types API @endlink
+ */
+function st56destacado_field_info(){
+  return array(
+    'st56destacado' => array(
+      'label' => t('st56Destacado'),
+      'description' => t('Identifica un elemento destacado del mapa'),
+      'default_widget' => 'st56destacado_widget',
+      'default_formatter' => 'st56destacado_formatter_1',
+    ),
+  );
+}
+
+ /* function st56destacado_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+   foreach ($items as $delta => $item) {
+     if (empty($item['idname'])) {
+       $errors[$field]['idname'][$langcode][$delta][] = array(
+           'error' => 'El campo no puede estar vacío',
+           'message' => t('Debe seleccionar una capa base de la lista'),
+       );
+     }
+   }
+ } */
+
+function st56destacado_field_is_empty($item, $field) {
+   return empty($item['name']);
+ }
+
+ /***********************************************************************
+ *  Field Type API: Formatter
+ *
+ *  These are the api hooks that present formatted (themed) output to the
+ *  user.
+ *  No se presenta ningún resultado en view-mode full, ya que solo se
+ *  utiliza para obtener los controles del mapa
+ *  Podriamos obtener un listado xml en vista resumen?
+ **********************************************************************/
+function st56destacado_field_formatter_info() {
+  return array (
+      'st56destacado_formatter_1' => array (
+          'label' => t ( 'Solo para tus ojos. No produce salida' ),
+          'field types' => array (
+              'st56destacado'
+          ),
+      ),
+      'st56destacado_formatter_2' => array(
+          'label' => t('Resumen en formato html'),
+          'field types' => array(
+              'st56destacado'
+          )
+      )
+  );
+}
+
+function st56destacado_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display){
+  $element = array();
+  switch ($display['type']) {
+    case 'st56destacado_formatter_1':
+      foreach ($items as $delta => $item) {
+        $element['$delta']['#markup'] = '';
+      }
+      break;
+    case 'st56destacado_formatter_2':
+      foreach ($items as $delta => $item) {
+        $element['$delta']['#markup'] = t("<p>Destacado: @a, Nombre: @b</p>",
+            array(
+                '@a'=>$item['idname'],
+                '@b'=>$item['name'],
+            ));
+      }
+      break;
+  }
+  return $element;
+}
+
+/**************************************************************************
+ * Field Type API: Widget
+ *
+ * The widget is the form element used to receive input from the user
+ * when the field is being populated.
+ **************************************************************************/
+
+function st56destacado_field_widget_info() {
+  return array (
+      'st56destacado_widget' => array (
+          'label' => t ( 'Añadir elemento destacado al mapa' ),
+          'field types' => array (
+              'st56destacado'
+          ),
+      ),
+  );
+}
+
+function st56destacado_field_widget_form($form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  if (!isset($form_state['st56destacado'][$field['field_name']]['id']) ) {
+    //$aux = $element['#entity'];
+    $form_state['st56destacado'][$field['field_name']]['id'] = $field['field_name']; // . '-' . $aux->nid; //field_destacado1-996
+  }
+
+  $element += array (
+      '#delta' => $delta
+  );
+
+  $id_base = $form_state['st56destacado'][$field['field_name']]['id'] . '-' . $delta;
+  $lon = isset($items[$delta]['lon']) ? $items[$delta]['lon'] : '';
+  $lat = isset($items[$delta]['lat']) ? $items[$delta]['lat'] : '';
+  $zoom = isset($items[$delta]['zoom']) ? $items[$delta]['zoom'] : '';
+  $srs = isset($items[$delta]['srs']) ? $items[$delta]['srs'] : '';
+  $js_datos["map-$id_base"] = array (
+      'id_base' => $id_base,
+      'map_id' => "map-$id_base",
+      'centro' => array(
+          'lon' => $lon,
+          'lat' => $lat,
+          'zoom' => $zoom,
+          'srs' => $srs,
+      ),
+  );
+
+  drupal_add_js( array( 'st56destacado' => $js_datos ), 'setting' );
+
+  $element ['idname'] = array (
+      //'#title' => 'Cógigo ine del núcleo',
+      '#type' => 'hidden', //textfield',
+      '#value' => $id_base,
+      //'#description' => t('Código INE del núcleo, sector, actuación, ...'),
+      //'#default_value' => isset($items[$delta]['idname']) ? $items[$delta]['idname'] : '',
+     // '#maxlength' => 255,
+      //'#required' => FALSE,
+      //'#size' => 30
+  );
+
+  $element ['name'] = array (
+      '#title' => 'Nombre del destacado',
+      '#type' => 'textfield',
+      '#description' => t('Nombre del núcleo, sector, actuación, ...'),
+      '#default_value' => isset($items[$delta]['name']) ? $items[$delta]['name'] : '',
+      '#maxlength' => 255,
+      '#required' => FALSE,
+      '#size' => 30
+  );
+
+  $element ['lon'] = array (
+      '#attributes' => array('id' => "lon-$id_base"),
+      '#type' => 'textfield',
+      '#default_value' => $lon, //isset($items[$delta]['xmin']) ? $items[$delta]['xmin'] : '384890',
+      '#title' => 'Coordenada x',
+      '#maxlength' => 60,
+      '#size' => 15,
+  );
+
+  $element ['lat'] = array (
+      '#attributes' => array('id' => "lat-$id_base"),
+      '#type' => 'textfield',
+      '#default_value' => $lat, //isset($items[$delta]['ymin']) ? $items[$delta]['ymin'] : '4786195',
+      '#title' => 'Coordenada y',
+      '#maxlength' => 60,
+      '#size' => 15,
+  );
+ $element ['zoom'] = array (
+      '#attributes' => array('id' => "zoom-$id_base"),
+      '#type' => 'textfield',
+      '#default_value' => $zoom, //isset($items[$delta]['xmax']) ? $items[$delta]['xmax'] : '384890',
+      '#title' => 'Zoom',
+      '#maxlength' => 60,
+      '#size' => 15,
+  );
+
+  $element ['srs'] = array (
+      '#attributes' => array('id' => "srs-$id_base"),
+      '#type' => 'textfield',
+      '#default_value' => $srs, //isset($items[$delta]['srs']) ? $items[$delta]['srs'] : 'EPSG:25830',
+      '#title' => 'SRS',
+      '#maxlength' => 30,
+      '#size' => 15,
+  );
+
+ /*  $element['mapa'] = array(
+      '#prefix' => "<div id='map-$id_base'  class='map_edit_class' style='height:300px;width:300px;'>",
+      //'#markup' => t('Centrar el mapa en la zona y hacer click'),
+      '#suffix' => '</div>',
+  ); */
+
+  return $element;
+}

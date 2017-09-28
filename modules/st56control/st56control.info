@@ -1,0 +1,5 @@
+name = st56Controles
+description = Permite añadir controles a un st56mapa
+package = Sector56
+core = 7.x
+dependencies[] = st56mapa

@@ -1,0 +1,14 @@
+<?php
+function st56control_field_schema($field) {
+  $columns = array(
+      'idname' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+      'contenedor' => array('type' => 'varchar', 'length' => 255, 'not_null' => TRUE),
+  );
+  $indexes = array(
+    'control' => array('idname', 'contenedor'),
+  );
+  return array(
+    'columns' => $columns,
+    'indexes' => $indexes,
+  );
+}

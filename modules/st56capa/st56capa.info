@@ -1,0 +1,5 @@
+name = Capas para st56mapa
+description = Suministra la capas del mapa tomadas de un almacén de capas
+package = Sector56
+core = 7.x
+dependencies[] = st56mapa

@@ -1,0 +1,1 @@
+!function(t){Drupal.behaviors.st56mapa_control_attribution={attach:function(a,o){t(".jmapas-map").once("jmapas-control-attribution",function(){var a=t(this).data("st56mapa").map,n=o.st56mapa.map_datos,r=n.containers.olattribution,i={separator:(s=n.controles[r].olattribution).opciones.separator},s=new OpenLayers.Control.Attribution(i);a.addControl(s)})}}}(jQuery);

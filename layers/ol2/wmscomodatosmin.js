@@ -1,0 +1,1 @@
+Drupal.st56mapa.layers.wmscomodatos=function(a,t,e,i){var s=new OpenLayers.Layer.WMS(e.name,e.url,{layers:e.capas,transparent:!0},{opacity:e.opacity,displayOutsideMaxExtent:!1,visibility:1==e.visible,attribution:e.attribution});return 2==e.seleccionable&&t.olcapasfeatureinfo.push(s),s};

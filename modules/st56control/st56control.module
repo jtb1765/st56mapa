@@ -1,0 +1,217 @@
+<?php
+/**
+ * @file
+ * A field using the Field API.
+ *
+ * This is updated from Barry Jaspan's presentation at Drupalcon Paris,
+ * @link http://acquia.com/community/resources/acquia-tv/intro-field-api-module-developers Video Presentation @endlink
+ *
+ * Providing a field requires:
+ * - Defining a field
+ *   - hook_field_info()
+ *   - hook_field_schema()
+ *   - hook_field_validate()
+ *   - hook_field_is_empty()
+ *
+ * - Defining a formatter for the field (the portion that outputs the field for
+ *   display)
+ *   - hook_field_formatter_info()
+ *   - hook_field_formatter_view()
+ *
+ * - Defining a widget for the edit form
+ *   - hook_field_widget_info()
+ *   - hook_field_widget_form()
+ *
+ * *
+ * See @link field_types Field Types API @endlink
+ */
+function st56control_field_info(){
+  return array(
+    'st56control' => array(
+      'label' => t('st56Control'),
+      'description' => t('Para añair controles a un st56mapa'),
+      'default_widget' => 'st56control_widget',
+      'default_formatter' => 'st56control_formatter_1',
+    ),
+  );
+}
+
+ /* function st56control_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+   foreach ($items as $delta => $item) {
+     if (empty($item['control_id'])) {
+       $errors[$field]['control_id'][$langcode][$delta][] = array(
+           'error' => 'El campo no puede estar vacío',
+           'message' => t('Debe seleccionar un control de la lista'),
+       );
+     }
+    if (empty($item['contenedor'])) {
+       $errors[$field]['contenedor'][$langcode][$delta][] = array(
+           'error' => 'El campo no puede estar vacío',
+           'message' => t('Debe seleccionar un contenedor para el control'),
+       );
+     }
+   }
+ } */
+
+function st56control_field_is_empty($item, $field) {
+   return empty($item['idname']) || empty($item['contenedor']);
+ }
+
+ /***********************************************************************
+ *  Field Type API: Formatter
+ *
+ *  These are the api hooks that present formatted (themed) output to the
+ *  user.
+ *  No se presenta ningún resultado en view-mode full, ya que solo se
+ *  utiliza para obtener los controles del mapa
+ *  Podriamos obtener un listado xml en vista resumen?
+ **********************************************************************/
+function st56control_field_formatter_info() {
+  return array (
+      'st56control_formatter_1' => array (
+          'label' => t ( 'Solo para tus ojos. No produce salida' ),
+          'field types' => array (
+              'st56control'
+          ),
+      ),
+      'st56control_formatter_2' => array(
+          'label' => t('Resumen en formato html'),
+          'field types' => array(
+              'st56control'
+          )
+      )
+  );
+}
+
+function st56control_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display){
+  $element = $datos = $controles = $listaDeEstilos = array();
+  switch ($display['type']) {
+    case 'st56control_formatter_1':
+      /* //
+      //Cargar almecen de controles para recuperar atributos y opciones
+      //
+      $almacen_controles = new DOMDocument();
+      if (!$almacen_controles->load("private://mapas/configuracion/st56mapa_controles.xml") ||
+        !$almacen_controles->validate()) {
+        return $element[0]['#markup'] = '<p>Error al cargar almacén de capas</p>';
+      }
+      // */
+      foreach ($items as $delta => $item) {
+        /* $idcontainer = $item['contenedor'];
+        $idcontrol = $item['idname'];
+        $container_almacen = $almacen_controles->getElementById($idcontainer);
+        $control_almacen = $almacen_controles->getElementById($idcontrol);
+        //datos para javascript
+        $datos['divids'][$idcontainer] = $container_almacen->getAttribute('divid');
+        $datos['containers'][$idcontrol] = $idcontainer;
+        //para pasar al tpl.php
+        $controles[$idcontainer][] = $idcontrol;
+        //
+        //Añadir behaviors
+        //
+        drupal_add_js(drupal_get_path('module', 'st56mapa') . "/behaviors/ol2/$idcontrol" . ST56MAPA_JS . '.js');
+        //
+        //Cargar atributos y opciones del control del almacén de controles
+        //
+        $attrs = $control_almacen->attributes;
+        foreach($attrs as $attr) {
+          $datos['controles'][$idcontainer][$idcontrol][$attr->nodeName] = $attr->nodeValue;
+        }
+        $opciones = $control_almacen->getElementsByTagName('opcion');
+        foreach ($opciones as $opcion) {
+          $datos['controles'][$idcontainer][$idcontrol]['opciones'][$opcion->getAttribute('key')] = $opcion->getAttribute('value');
+        }
+        //
+        if (isset($datos['controles'][$idcontainer][$idcontrol]['opciones']['style'])) {
+          $estilo = $datos['controles'][$idcontainer][$idcontrol]['opciones']['style'];
+          $listaDeEstilos[$estilo] = $estilo;
+        } */
+        //
+        $element['$delta']['#markup'] = '';
+        //
+        //
+      }
+      /* if (!st56mapa_load_estilos_2($listaDeEstilos, $datos)) {
+        return $element[0]['#markup'] = '<p>Error al cargar estilos</p>';
+      }
+      //
+      $element['#attached']['js'][] = array(
+          'type' => 'setting',
+          'data' => array(
+              'st56control' => $datos,
+          )
+      ); */
+      break;
+    case 'st56control_formatter_2':
+      foreach ($items as $delta => $item) {
+        $element['$delta']['#markup'] = t("<p>Control: @a en el contenedor @b</p>",
+            array(
+                '@a'=>$item['idname'],
+                '@b'=>$item['contenedor'],
+            ));
+      }
+      break;
+  }
+  return $element;
+}
+
+/**************************************************************************
+ * Field Type API: Widget
+ *
+ * The widget is the form element used to receive input from the user
+ * when the field is being populated.
+ **************************************************************************/
+
+function st56control_field_widget_info() {
+  return array (
+      'st56control_widget' => array (
+          'label' => t ( 'Añadir control al mapa' ),
+          'field types' => array (
+              'st56control'
+          ),
+      ),
+  );
+}
+
+function st56control_field_widget_form($form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  if (!isset($form_state['st56control']['contenedores']) || !isset($form_state['st56control']['controles'])) {
+    $almacen_controles = new DOMDocument();
+    if ($almacen_controles->load("private://mapas/configuracion/st56mapa_controles.xml") && $almacen_controles->validate()) {
+      $lista_contenedores = array('');
+      $lista_controles = array('');
+      $containers = $almacen_controles->getElementsByTagName('container');
+      foreach ($containers as $container){
+        $lista_contenedores[] = $container->getAttribute('idname');
+        $controles = $container->getElementsByTagName('control');
+        foreach ($controles as $control) {
+          $lista_controles[] = $control->getAttribute('idname');
+        }
+      }
+      $form_state['st56control']['contenedores'] = drupal_map_assoc($lista_contenedores);
+      $form_state['st56control']['controles'] = drupal_map_assoc($lista_controles);
+    }
+  }
+
+  $element += array (
+      '#delta' => $delta
+  );
+  $element ['idname'] = array ();
+
+  $element ['idname'] += array (
+      '#type' => 'select',
+      '#options' => $form_state['st56control']['controles'],
+      '#default_value' => isset($items[$delta]['idname']) ? $items[$delta]['idname'] : '',
+      '#title' => 'Control',
+      //'#element_validate'
+  );
+
+  $element ['contenedor'] = array ();
+
+  $element ['contenedor'] += array (
+      '#type' => 'select',
+      '#options' => $form_state['st56control']['contenedores'],
+      '#default_value' => isset($items[$delta]['contenedor']) ? $items[$delta]['contenedor'] : '',
+      '#title' => 'Contenedor'
+  );
+  return $element;
+}

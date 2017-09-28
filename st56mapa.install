@@ -1,0 +1,41 @@
+<?php
+/**
+ * @file
+ * Install/Update/Uninstall functions for color_example module
+ */
+
+/**
+ * Implements hook_field_schema().
+ *
+ * This defines the actual database schema of the field, using the format
+ * used by the Schema API.
+ *
+ * campo: nombre del campo que contiene el archivo. SE PUEDE QUITAR
+ * lon, lat, zoom, srs: centro y zoom de la vista incial del mapa
+ * controles, capasbas, capasdatos, destacado1, destacado2, destacado3:
+ * nombres de los campos donde se almacene dichos elementos
+ *
+ * @see hook_field_schema()
+ * @link schemaapi Schema API @endlink
+ */
+function st56mapa_field_schema($field) {
+  $columns = array(
+      'lon' => array('type' => 'numeric', 'precision' => 20, 'scale' => 12, 'not null' => FALSE,),
+      'lat' => array('type' => 'numeric', 'precision' => 20, 'scale' => 12, 'not null' => FALSE,),
+      'zoom' => array('type' => 'numeric', 'precision' => 20, 'scale' => 12, 'not null' => FALSE,),
+      'srs' => array('type' => 'varchar', 'length' => 30, 'not_null' => FALSE),
+      'controles' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'capasbase' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'capasdatos' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'destacados1' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'destacados2' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+      'destacados3' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE),
+  );
+  $indexes = array(
+    'campos' => array('lon', 'lat', 'zoom', 'srs'),
+  );
+  return array(
+    'columns' => $columns,
+    'indexes' => $indexes,
+  );
+}

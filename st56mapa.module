@@ -1,0 +1,568 @@
+<?php
+ /*************************************************************
+  *
+  * Para cargar min js
+  *
+  ***************************************************************/
+//Hay 12 niveles de zoom a partir de la extensión máxima, que corresponde
+//en este caso a Cantabria, que sería el zoom 0
+define('ST56MAPA_MAP_MAX_ZOOM', 18);
+
+define('ST56MAPA_LIBRARIES', 'sites/all/libraries');
+//define('ST56MAPA_JS', '');
+//
+//define('ST56MAPA_LIBRARIES', 'http://sector56.es/sites/all/libraries');
+define('ST56MAPA_JS', 'min');
+ini_set("allow_url_fopen", true);
+ini_set("allow_url_include", true);
+include('st56mapa.inc');
+include('st56mapa-field.inc');
+
+function st56mapa_permission() {
+  $perms = array(
+    'acceder ficheros via ajax' => array(
+      'title' => t('Ver mapas'),
+    ),
+    'actualizar datos via ajax' => array(
+        'title' => t('Modificar mapas'),
+    ),
+  );
+  return $perms;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function st56mapa_theme($existing, $type, $theme, $path) {
+  return array (
+      'st56mapa_formatter_openlayers2_theme' => array (
+          'template' => 'st56mapa_mapa_ol2',
+          'path' => drupal_get_path ( 'module', 'st56mapa' ) . '/templates',
+          'variables' => array (
+              'id_mapa' => array (),
+              //'destacados' => array (),
+              //'etiqueta_detalles' => array (),
+              //'controles' => array (),
+              //'busqueda' => array (),
+              'capasdatos' => array ()
+          )
+      )
+  );
+}
+
+/**
+ * hook menu
+ * @return multitype:string multitype:string
+ */
+function st56mapa_menu() {
+  //
+  $items = array();
+  //
+  $items['mapas/cambiar_srs'] = array(
+   		'page callback' => 'st56mapa_cambiarsrs',
+   		'access arguments' => array('actualizar datos via ajax'),
+   		'type' => MENU_CALLBACK,
+   );
+  $items['mapas/detalles_refcat'] = array(
+    'page callback' => 'st56mapa_detallesrefcat',
+    'access arguments' => array('acceder ficheros via ajax'),
+    'type' => MENU_CALLBACK,
+    );
+  $items['mapas/buscar_parcela_por_refcat'] = array(
+    'page callback' => 'st56mapa_buscar_parcela_por_refcat',
+    'access arguments' => array('acceder ficheros via ajax'),
+    'type' => MENU_CALLBACK,
+    );
+  $items['mapas/before_get_feature_info'] = array(
+    'page callback' => 'st56mapa_beforegetfeatureinfo',
+    'access arguments' => array('acceder ficheros via ajax'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['mapas/inventario/%/%'] = array(
+    'page callback' => 'st56mapa_inventario',
+  	'access arguments' => array('acceder ficheros via ajax'),
+ 	'page arguments' => array(2, 3),
+ 	'type' => MENU_CALLBACK,
+  );
+  $items['mapas/planeamiento/%/%'] = array(
+    'page callback' => 'st56mapa_planeamiento',
+    'access arguments' => array('acceder ficheros via ajax'),
+    'page arguments' => array(2, 3),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function st56mapa_planeamiento($filename, $srs) {
+	$texto = '';
+	if (isset($_POST['DATOS']) && $_POST['DATOS'] == 'fichero') {
+		//
+		$filename= "private://mapas/ficheros/$filename";
+		//
+		$opts = array('http' => array(
+		    'header' => 'Accept-Charset: UTF-8, *;q=0',
+		));
+		$context = stream_context_create($opts);
+		$texto = file_get_contents($filename, false, $context);
+	}
+	exit(drupal_json_output($texto));
+	//
+	//$respuesta = array('filecontent'=>$texto,);
+	//exit(drupal_json_output($respuesta));
+}
+function st56mapa_inventario($inventario, $srs) {
+	$geojson = array();
+    //$tipodatos = $_POST['DATOS'];
+    if (isset($_POST['DATOS']) && $_POST['DATOS'] == 'vista') {
+      $geojson = array(
+	    'type' => 'FeatureCollection',
+	    'crs' => array(
+	        'type' => 'name',
+	        'properties' => array(
+	            'name' => "urn:ogc:def:crs:$srs"
+	        )
+	    ),
+	    'features' => array(),
+	  );
+  	  //$atributos = json_decode($_POST['ATRIBUTOS'], TRUE); //ver layers/vector.js
+  	  $tid = st56mapa_get_term_from_name($inventario, 'Inventario');
+  	  //watchdog('jmapas_inventario', t('%1 => %2', array('%1'=>$inventario, '%2'=>$tid)));
+  	  //$result = db_query('SELECT n.bundle, n.entity_id, n.field_codigo_ine_value
+  	  //		FROM {field_data_field_codigo_ine} n WHERE n.bundle = :ntype AND n.field_codigo_ine_value = :nine' ,
+  	  //		array(':ntype' => $url, ':nine' => $codigo_ine));
+  	  $nids = taxonomy_select_nodes($tid, FALSE);
+
+  	  foreach ($nids as $index=>$nid) {
+  		$node = node_load($nid);
+  		if ($srs == $node->field_srsutm['und']['0']['value']) {
+  			//
+  			$pathestilo = '';
+  			if (isset($node->field_foto1['und']['0']['uri']) && $node->field_foto1['und']['0']['uri'] != '') {
+  				$uri = $node->field_foto1['und']['0']['uri'];
+  				$path = drupal_realpath($uri);
+  				$pathestilo = image_style_url("medium", $uri);
+  			}
+  			//
+  			$geojson['features'][] = array(
+  			    'type' => 'Feature',
+  			    'properties' => array(
+  			        //'ID' => $node->field_id2['und']['0']['value'],
+  			        'TITLE' => $node->title,
+  			        'IMG' => $pathestilo,
+  			        'HREF' => "/node/$nid",
+  			    ),
+  			    'geometry' => array(
+  			        'type' => 'Point',
+  			        'coordinates' => array(
+  			            $node->field_xutm['und']['0']['value'],
+  			            $node->field_yutm['und']['0']['value']
+  			        )
+  			    )
+  			);
+  		}
+  	  } //fin de foreach
+    } //fin de if
+	//
+	exit(drupal_json_output($geojson)); //$geojson));
+	//$respuesta = array( 'filecontent'=>$geojson, );
+	//exit(json_encode($respuesta));
+}
+/**
+ * Petición al servidor de mapas del GOBCAN o el que cuadre
+ * para evitar la restricción existente en javascript.
+ * Simplemente traslada la petición del comando
+ * Drupal.st56mapa.interseccion_capas_wms
+ * y devuelve el resultado
+ */
+function st56mapa_beforegetfeatureinfo() {
+  //watchdog('jmapas', 'st56mapa_beforegetfeatureinfo');
+  //header("Access-Control-Allow-Origin: mapas2.territoriodecantabria.es");
+  $apiurl = $_POST['URL'];
+  $data = array(
+    'SERVICE'=>  $_POST['SERVICE'],
+    'VERSION'=>  $_POST['VERSION'], //'1.1.1',
+    'REQUEST'=>  $_POST['REQUEST'], //'GetFeatureInfo',
+    'LAYERS'=>  $_POST['LAYERS'], //'0,1',
+    'QUERY_LAYERS'=>  $_POST['QUERY_LAYERS'], //'0,1',
+    'STYLES'=>  $_POST['STYLES'], //'',
+    'BBOX'=>  $_POST['BBOX'], //map.getExtents(),
+    'FEATURE_COUNT'=>  $_POST['FEATURE_COUNT'], //'10',
+    'HEIGHT'=>  $_POST['HEIGHT'], //map.size.h,
+    'WIDTH'=>  $_POST['WIDTH'], //map.size.w,
+    'FORMAT'=>  $_POST['FORMAT'], //'image/png',
+    'INFO_FORMAT'=>  $_POST['INFO_FORMAT'], //'text/html',
+    'SRS'=>  $_POST['SRS'], //'EPSG:25830',
+    'X'=>  $_POST['X'], //evt.xy.x,
+    'Y'=>  $_POST['Y'], //evt.xy.y
+    );
+  $fullurl = url($apiurl, array('query'=>$data));
+  $req = drupal_http_request($fullurl);
+  //
+  $doc = new DOMDocument();
+  $doc->loadXML($req->data);
+  //Una coleccion por cada capa de la consulta
+  $featuresinfocollection = $doc->getElementsByTagName('FeatureInfoCollection');
+  $i = 0; $info = array();
+  foreach ($featuresinfocollection as $coleccion) {
+    $aux = array();
+    $fields = $coleccion->getElementsByTagName('Field');
+    foreach ($fields as $field) {
+      $aux[$field->getElementsByTagName('FieldName')->item(0)->nodeValue] =
+      $field->getElementsByTagName('FieldValue')->item(0)->nodeValue;
+    }
+    //$info[$i++] = $aux;
+    $info[$coleccion->getAttribute('layername')] = $aux;
+  }
+  //$fields = $doc->getElementsByTagName('Field');
+  //$featureinfo = array();
+  //foreach ($fields as $field) {
+  //  $featureinfo[$field->getElementsByTagName('FieldName')->item(0)->nodeValue] =
+  //   $field->getElementsByTagName('FieldValue')->item(0)->nodeValue;
+  //}
+  $respuesta = array(
+    'featureinfo'=> $info,
+    'nombre'=> $_POST['NOMBRE'],
+    'puntoid'=> $_POST['PUNTOID'],
+    'capaidname'=> $_POST['CAPAIDNAME'],
+    'sobreescribir'=>$_POST['SOBREESCRIBIR'],
+     'grupo'=>$_POST['GRUPO'],
+  );
+  exit(drupal_json_output($respuesta)); //json_encode($respuesta)); //req->data);
+}
+/**
+ * Actualizar el campo field_google (geofield) con las coordenadas
+ * xutm e yutm transformadas al sistema EPSG:4326.
+ * Se ejecuta la función para cada nodo
+ */
+function st56mapa_cambiarsrs() {
+  global $user;
+  $data = array('nodoid'=>'Inicie sesión como administrador');
+  if (!user_is_logged_in() || $user->uid != 1)
+  {
+  	exit(drupal_json_output($data)); //json_encode($data));
+  }
+  if (!isset($_POST['js']) || $_POST['js'] != '123456') {
+    $data = array('nodoid'=>'No tiene permiso');
+    exit(drupal_json_output($data)); //
+  }
+  $string = $_POST['nodoid']; // la cadena es /node/5128
+  $nodoid = substr($string, 6); //ahora es 5128
+  $node = node_load($nodoid);
+  $raw_data = array(
+  		'lon'=>$_POST['x'],
+  		'lat'=>$_POST['y']
+  );
+  $values = geofield_compute_values($raw_data, 'lat/lon');
+  foreach ($values as $key=>$value) {
+  	$node->field_google['und']['0'][$key] = $value;
+  }
+  node_save($node);
+  exit(drupal_json_output($data));
+  //exit(json_encode($data));
+}
+/**
+ * Obtener la referencia catastral a partir de las coordenadas de un punto
+ * de la parcela
+ * Entrada de jQuery.ajax en Drupal.st56mapa.referencia_catastral
+ * Ejecuta un comando ajax al terminar
+ */
+function st56mapa_detallesrefcat() {
+  //watchdog('jmapas', 'detallesrefcat');
+  if (!isset($_POST['js']) || $_POST['js'] != '123456') {
+  	//watchdog('jmapas', 'solicitud no valida');
+  	$data = array(
+  			'featureid'=>$_POST['id'],
+  			'cucoor'=>'0',
+  			'cuerr'=>'1',
+  			'errcod'=>'',
+  			'errdes'=>t('Parece que la solicitud no es válida')
+  	);
+  	exit(drupal_json_output($data));
+  	//exit(json_encode($data));
+  }
+  //
+  $apiurl = 'http://ovc.catastro.meh.es/ovcservweb/OVCSWLocalizacionRC/OVCCoordenadas.asmx/Consulta_RCCOOR';
+  $data = array(
+    'SRS'=> $_POST['srs'],
+    'Coordenada_X' => $_POST['x'],
+    'Coordenada_Y' => $_POST['y'],
+  );
+  $fullurl = url($apiurl, array('query'=>$data));
+  $req = drupal_http_request($fullurl);
+  //watchdog('jmapas', 'httprequest');
+  //
+  //Error en la conexión
+  //
+  if (isset($req->error)) {
+    //watchdog('jmapas', 'isseterror');
+    $data = array(
+      'featureid'=>$_POST['id'],
+      'cucoor'=>'0',
+      'cuerr'=>'1',
+      'errcod'=>$req->code,
+      'errdes'=>$req->error
+    );
+    exit(drupal_json_output($data));
+    //exit(json_encode($data));
+  }
+  //
+  //Gestionar la respuesta
+  //
+  $doc = new DOMDocument();
+  $doc->loadXML($req->data);
+  //
+  //Comprobamos si ha habido error en los datos
+  //
+  $cucoor = $doc->getElementsByTagName('cucoor')->item(0)->nodeValue;
+  $cuerr = $doc->getElementsByTagName('cuerr')->item(0)->nodeValue;
+  //
+  if ($cucoor == 1) {
+    //watchdog('jmapas', 'cucoor');
+    //Se han obtenido bien los datos
+    $pc1 = $doc->getElementsByTagName('pc1')->item(0)->nodeValue; //caracteres 1-7
+    $pc2 = $doc->getElementsByTagName('pc2')->item(0)->nodeValue; //caracteres 8-14
+    $ldt = $doc->getElementsByTagName('ldt')->item(0)->nodeValue;
+    $data = array(
+      'featureid'=>$_POST['id'],
+      'cucoor'=>'1',
+      'cuerr'=>'0',
+      'refcat'=>$pc1 . $pc2,
+      'refdes'=>$ldt
+    );
+    exit(drupal_json_output($data));
+    //exit(json_encode($data));
+  }
+  else if ($cuerr == 1) {
+    //watchdog('jmapas', 'cuerr');
+    //Hay algún error
+    //$err = $doc->getElementsByTagName('err')->item(0);
+    $cod = $doc->getElementsByTagName('cod')->item(0)->nodeValue;
+    $des = $doc->getElementsByTagName('des')->item(0)->nodeValue;
+    $data = array(
+      'featureid'=>$_POST['id'],
+      'cucoor'=>'0',
+      'cuerr'=>'1',
+      'errcod'=>$cod,
+      'errdes'=>$des
+    );
+    exit(drupal_json_output($data));
+    //exit(json_encode($data));
+  }
+  else {
+    //watchdog('jmapas', 'otroerror');
+    $data = array(
+      'featureid'=>$_POST['id'],
+      'cucoor'=>'0',
+      'cuerr'=>'1',
+      'errcod'=>'',
+      'errdes'=>'No se puede conectar con el servidor del catastro.'
+    );
+    exit(drupal_json_output($data));
+    //exit(json_encode($data));
+  }
+}
+/**
+ * Obtener cdg de una parcela por medio de su referencia catastral
+ */
+function st56mapa_buscar_parcela_por_refcat() {
+  if (!isset($_POST['js']) || $_POST['js'] != '123456') {
+    $data = array(
+      'cuerr'=>'1',
+      'errcod'=>'',
+      'errdes'=>'No se puede conectar con el servidor del catastro.'
+    );
+    exit(drupal_json_output($data));
+  }
+  //
+  $refcat = $_POST['refcat'];
+  //validamos referencia catastral
+  $patron = '/[A-Za-z0-9]{14}/';
+  if (preg_match($patron, $refcat) !== 1) {
+    $output = t('El texto @1 parece que no es una referencia catastral válida', array('@1'=>$refcat));
+    $data = array(
+      'cuerr'=>'1',
+      'errcod'=>'',
+      'errdes'=>$output,
+    );
+    exit(drupal_json_output($data));
+  }
+  //$refcat = strtoupper($refcat);
+  //watchdog('jmapas', t('RefCat: %1', array('%1'=>$refcat)));
+  //httprequest al catastro
+  $apiurl = 'http://ovc.catastro.meh.es/ovcservweb/OVCSWLocalizacionRC/OVCCoordenadas.asmx/Consulta_CPMRC';
+  $data = array(
+    'Provincia'=>'',
+    'Municipio'=>'',
+    'SRS'=>'EPSG:25830',
+    'RC'=>$refcat,
+  );
+  $fullurl = url($apiurl, array('query'=>$data));
+  $req = drupal_http_request($fullurl);
+  //
+  //Error en la conexión
+  //
+  if (isset($req->error)) {
+    $data = array(
+      'cuerr'=>'1',
+      'errcod'=>$req->code,
+      'errdes'=>$req->error,
+    );
+    exit(drupal_json_output($data));
+  }
+  //
+  $doc = new DOMDocument();
+  $doc->loadXML($req->data);
+  //
+  //Comprobamos si ha habido error en los datos
+  //
+  $cucoor = $doc->getElementsByTagName('cucoor')->item(0)->nodeValue;
+  $cuerr = $doc->getElementsByTagName('cuerr')->item(0)->nodeValue;
+  //
+  if ($cucoor == 1) {
+    $geo = $doc->getElementsByTagName('geo')->item(0);
+    $data = array(
+      'cuerr'=>'0',
+      'X'=>(real)$geo->getElementsByTagName('xcen')->item(0)->nodeValue,
+      'Y'=>(real)$geo->getElementsByTagName('ycen')->item(0)->nodeValue,
+      'SRS'=>$geo->getElementsByTagName('srs')->item(0)->nodeValue,
+      'RC'=>$refcat
+    );
+    exit(drupal_json_output($data));
+  }
+  else if ($cuerr == 1) {
+    //$err = $doc->getElementsByTagName('err')->item(0);
+    $cod = $err->getElementsByTagName('cod')->item(0)->nodeValue;
+    $des = $err->getElementsByTagName('des')->item(0)->nodeValue;
+    $data = array(
+      'cuerr'=>'1',
+      'errcod'=>$cod,
+      'errdes'=>$des,
+    );
+    exit(drupal_json_output($data));
+  }
+  else {
+    $output = 'No se puede conectar con el servidor del catastro.';
+    $commands = array();
+    $commands[] = array('command'=>'errorConexion', 'data'=>$output);
+    $data = array(
+      'cuerr'=>'1',
+      'errcod'=>'',
+      'errdes'=>$output,
+    );
+    exit(drupal_json_output($data));
+  }
+}
+//
+//   $textocomojson = drupal_json_encode($tematico);
+//   file_unmanaged_save_data($textocomojson, 'private://Configuracion_mapas/rionansa01.json', FILE_EXISTS_REPLACE);
+/* function st56mapa_busqueda_form($form, &$form_state) {
+  //
+ $form['st56mapa_busqueda']['st56mapa_referencia_catastral'] = array(
+    '#title'=>t('Buscar parcela'),
+    '#type'=>'textfield',
+    //'#description'=>t('Introducir referencia catastral 14 cifras'),
+    '#attributes' => array(
+      'title'=>t('Introducir referencia catastral'),
+
+      ),
+    //'#default_value'=>'Referencia catastral',
+    '#maxlength'=>14,
+    //'#required'=>TRUE,
+    '#size'=>18,
+    );
+  $form['st56mapa_busqueda']['st56mapa_buscar'] = array(
+    '#type' => 'image_button',
+    '#attributes' => array('title'=>t('Buscar parcela por referencia catastral'),),
+    //'#src' => 'sites/all/themes/mitema/images/buscar1_15.png',
+    '#src' => drupal_get_path('module', 'st56mapa') .'/images/buscar1_25.png',
+    '#ajax'=>array(
+      'callback'=>'st56mapa_buscar_ajax_callback',
+      //'wrapper'=>array('smq-simulacion', 'smq-quiniela'),
+      'progress' => array(
+        'message' => '...',
+        'type' => 'throbber',
+        ),
+      ),
+    );
+  return $form;
+}
+function st56mapa_buscar_ajax_callback($form, &$form_state) {
+  $refcat = $form_state['values']['st56mapa_referencia_catastral'];
+  //validamos referencia catastral
+  $patron = '/[A-Za-z0-9]{14}/';
+  if (preg_match($patron, $refcat) !== 1) {
+    $output = t('El texto @1 parece que no es una referencia catastral válida', array('@1'=>$refcat));
+    $commands = array();
+    $commands[] = array('command'=>'errorConexion', 'data'=>$output);
+    return array(
+      '#type'=>'ajax',
+      '#commands'=>$commands);
+  }
+  //$refcat = strtoupper($refcat);
+  //watchdog('jmapas', t('RefCat: %1', array('%1'=>$refcat)));
+  //httprequest al catastro
+  $apiurl = 'http://ovc.catastro.meh.es/ovcservweb/OVCSWLocalizacionRC/OVCCoordenadas.asmx/Consulta_CPMRC';
+  $data = array(
+    'Provincia'=>'',
+    'Municipio'=>'',
+    'SRS'=>'EPSG:25830',
+    'RC'=>$refcat,
+  );
+  $fullurl = url($apiurl, array('query'=>$data));
+  $req = drupal_http_request($fullurl);
+  //
+  //Error en la conexión
+  //
+  if (isset($req->error)) {
+    $output = 'Error ' . $req->code . ': ' . $req->error;
+    $commands = array();
+    $commands[] = array('command'=>'errorConexion', 'data'=>$output);
+    return array(
+      '#type'=>'ajax',
+      '#commands'=>$commands);
+  }
+  //
+  $doc = new DOMDocument();
+  $doc->loadXML($req->data);
+  //
+  //Comprobamos si ha habido error en los datos
+  //
+  $cucoor = $doc->getElementsByTagName('cucoor')->item(0)->nodeValue;
+  $cuerr = $doc->getElementsByTagName('cuerr')->item(0)->nodeValue;
+  //
+  if ($cucoor == 1) {
+    $geo = $doc->getElementsByTagName('geo')->item(0);
+    $xy = array(
+      'X'=>(real)$geo->getElementsByTagName('xcen')->item(0)->nodeValue,
+      'Y'=>(real)$geo->getElementsByTagName('ycen')->item(0)->nodeValue,
+      'SRS'=>$geo->getElementsByTagName('srs')->item(0)->nodeValue,
+      'RC'=>$refcat
+    );
+    //drupal_add_js(array('jmapas' => array('parcelaxy'=>$xy)), 'setting');
+    $commands = array();
+    $commands[] = array('command'=>'centrarParcelaXY', 'data'=>$xy);
+    return array(
+      '#type'=>'ajax',
+      '#commands'=>$commands);
+  }
+  else if ($cuerr == 1) {
+    $err = $doc->getElementsByTagName('err')->item(0);
+    $cod = $err->getElementsByTagName('cod')->item(0)->nodeValue;
+    $des = $err->getElementsByTagName('des')->item(0)->nodeValue;
+    $output = 'Error ' . $cod . ': ' . $des;
+    $commands = array();
+    $commands[] = array('command'=>'errorConexion', 'data'=>$output);
+    return array(
+      '#type'=>'ajax',
+      '#commands'=>$commands);
+  }
+  else {
+    $output = 'No se puede conectar con el servidor del catastro.';
+    $commands = array();
+    $commands[] = array('command'=>'errorConexion', 'data'=>$output);
+    return array(
+      '#type'=>'ajax',
+      '#commands'=>$commands);
+  }
+}
+*/

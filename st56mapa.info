@@ -1,0 +1,8 @@
+name = Mapa sector56
+description = Campo para representar grandes cantidades de datos en OpenLayers o Google
+package = Sector56
+core = 7.x
+dependencies[] = geofield
+files[] = st56mapa.module
+files[] = st56mapa.install
+files[] = st56mapa.inc
